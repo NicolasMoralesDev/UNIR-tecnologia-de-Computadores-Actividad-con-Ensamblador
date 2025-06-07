@@ -1,0 +1,90 @@
+.data
+ #Mensajes a mostrar por pantalla
+    Aclaracionusuario: .asciiz "Por favor utiliza solo números enteros, de lo contrario el programa podria fallar \n"
+    Valor_x1: .asciiz "Introduce el valor de x1: "
+    Valor_y1: .asciiz "Introduce el valor de y1: "
+    Valor_x2: .asciiz "Introduce el valor de x2: "
+    Valor_y2: .asciiz "Introduce el valor de y2: "
+    Valor_x:  .asciiz "Introduce el valor de x:  "
+
+    # Array de punteros a los Array_MensajesUsers(nos permite marcar cada mensaje)
+    Array_MensajesUsers: .word Valor_x, Valor_x1, Valor_y1, Valor_x2, Valor_y2
+
+    # Aqui guardaremos los valores de las diferentes variables en la memoria
+    Array_Valores: .space 20   # como queremos utilizar números enteros, utilizamos 4 bytes por número, como tenemos 5 valores, utilizamos 20 bytes.
+
+    Resultado_Función: .asciiz "El resultado de la ecuación nos da que el valor de Y es: "
+
+.text
+.globl main
+main: 
+   # Muestra el mensaje de aclaración al usuario
+    la $a0, Aclaracionusuario   # Cargamos la función que indica el mensaje
+    li $v0, 4                   # Instrucción para imprimir funciones
+    syscall                     # Llamada al sistema para mostrar el mensaje
+    
+# Vamos a generar un bucle para almacenar las variables del usuario
+    li $t0, 0 #Contador i = 0 , indica que el bucle comienza en 0
+    la $t1, Array_MensajesUsers # Define donde se almacena la Dirección base de Array_MensajesUsers , Necesitamos definir donde va a comenzar a contar la array
+    la $t4, Array_Valores       # Define donde se almacena la Dirección base del array de datos, Necesitamos definir donde va a comenzar a contar la array
+
+leer_valores:
+    sll $t2, $t0, 2        # offset = i * 4 , desplazamos los bits a la izquierda. Nos indica cuanto nos tenemos que mover desde la dirección base. Nos movemos de 4 en 4 porque ya habiamos definido que cada valor tendria 4 bytes.
+    add $t3, $t1, $t2      # dirección de Array_MensajesUsers[i](i es el valor de la array en la que estamos trabajando o dicho de otra manera, el valor de la variable que toca ahora) , Nos traslada a la dirección sumando los bits que necesitamos desplazarnos a la dirección base.
+    lw $a0, 0($t3)         # Carga en $a0 el puntero que hay almacenado en la Array de Mensajes
+    li $v0, 4              # Muestra mensaje que corresponde a la dirección del array.
+    syscall		   # Llama al sistema para poder mostrar el mensaje en pantalla solicitando la variable
+
+    li $v0, 5              # Ingresamos el valor de la variable solicitada
+    syscall                # Llama al sistema para poder realizar la entrada del valor
+
+    add $t5, $t4, $t2      # Calcular dirección en Array_Valores[i], Nos traslada a la dirección de la array que se debe trabajar
+    sw $v0, 0($t5)         # Guardar el valor de la palabra (el número entero)
+
+    addi $t0, $t0, 1       # i++ , suma 1 al bucle para poder continuar, en este caso la instrucción utiliza un valor fijo y no el de otro registro
+    li $t6, 5
+    blt $t0, $t6, leer_valores #Repite el bucle. Solo mientas t0 sea menor que t6
+
+# Carga los valores de las variables guardados en la memoria
+lw $t0, 0($t4)    # X
+lw $t1, 4($t4)    # X1
+lw $t2, 8($t4)    # Y1
+lw $t3, 12($t4)   # X2
+lw $t4, 16($t4)   # Y2
+
+# Convierte los valores enteros a bits
+mtc1 $t0, $f0     # X
+mtc1 $t1, $f1     # X1
+mtc1 $t2, $f2     # Y1
+mtc1 $t3, $f3     # X2
+mtc1 $t4, $f4     # Y2
+# Convierte esos valores en bits a coma flotante.
+cvt.s.w $f0, $f0
+cvt.s.w $f1, $f1
+cvt.s.w $f2, $f2
+cvt.s.w $f3, $f3
+cvt.s.w $f4, $f4
+
+# Resolución de Y = ((X - X1) / (X2 - X1)) * (Y2 - Y1) + Y1
+#Resolvemos respetando el orden de prioridad de las operaciones.
+sub.s $f5, $f0, $f1       # Calcula X - X1 y lo almacena en f5
+sub.s $f6, $f3, $f1       # Calcula X2 - X1 y lo almacena en f6
+div.s $f7, $f5, $f6       # Calcula (X - X1) / (X2 - X1) y lo almacena en F7
+
+sub.s $f8, $f4, $f2       # Calcula Y2 - Y1 y lo almacena en f8
+mul.s $f9, $f7, $f8       # Calcula el resultado de la division por Y2-Y1 y lo almacena en f9
+add.s $f10, $f9, $f2      # CCalcula el resultado final (Y) y lo almacena en f10 para mostrarlo posteriormente.
+
+Mostrar: #muestra el resultado después de realizar los calculos de la función en pantalla
+li $v0, 4
+la $a0, Resultado_Función
+syscall
+
+mov.s $f12, $f10    # pasar resultado a $f12(esto se realiza por convención, ya que para mostrar un número en coma flotante , se necesita que este en f12)
+li $v0, 2           # Imprime el resultado en coma flotante
+syscall
+
+
+# Salir del programa
+li $v0, 10
+syscall
